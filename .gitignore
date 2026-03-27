@@ -1,0 +1,28 @@
+# Gradle build output
+build/
+.gradle/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# VS Code
+.vscode/
+
+# Mac OS
+.DS_Store
+
+# Fabric/Loom generated run directories
+run/
+
+# Remapped JARs
+remapped*.jar
