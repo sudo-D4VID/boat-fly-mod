@@ -1,0 +1,103 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: boatfly-mod
+          path: build/libs/*-sources.jar
+          if-no-files-found: warn
+
+      - name: Upload compiled mod JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: boatfly-mod-compiled
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+          generate_release_notes: true
+          body: |
+            ## Boat Fly Mod ${{ github.ref_name }}
+
+            ### Installation
+            1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for Minecraft 1.20.1
+            2. Download `boatfly-${{ github.ref_name }}.jar` below
+            3. Drop it into your `.minecraft/mods/` folder
+            4. Launch Minecraft with the Fabric profile
+
+            ### Controls
+            - **Space (Jump)** – Ascend while in a boat
+            - **Shift (Sneak)** – Descend while in a boat
+            - Release both keys to hover / slowly descend
+
+            ### Compatibility
+            - ✅ Vanilla Minecraft 1.20+
+            - ✅ OptiFine (client-side rendering mod, no conflict)
+            - ✅ Sodium (client-side rendering mod, no conflict)
+            - ✅ Multiplayer (client-side only, no server mod required)

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "boatfly",
+  "version": "${version}",
+  "name": "Boat Fly",
+  "description": "Lets you fly in boats! Hold Space to ascend, Shift to descend. Works with OptiFine, Sodium, and vanilla Minecraft.",
+  "authors": [
+    "sudo-D4VID"
+  ],
+  "contact": {
+    "sources": "https://github.com/sudo-D4VID/boat-fly-mod",
+    "issues": "https://github.com/sudo-D4VID/boat-fly-mod/issues"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "com.boatfly.BoatFlyMod"
+    ]
+  },
+  "mixins": [
+    "boatfly.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": ">=1.20"
+  }
+}
