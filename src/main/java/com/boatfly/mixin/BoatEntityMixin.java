@@ -66,7 +66,7 @@ public abstract class BoatEntityMixin {
     @Inject(method = "tick", at = @At("RETURN"))
     private void boatFlyTick(CallbackInfo ci) {
         // Respect the runtime toggle (Ctrl+Alt+Shift+1)
-        if (!BoatFlyConfig.flyEnabled.get()) return;
+        if (!BoatFlyConfig.flyEnabled) return;
 
         BoatEntity self = (BoatEntity) (Object) this;
 
@@ -80,25 +80,22 @@ public abstract class BoatEntityMixin {
         // Bail out if there is no local player or they are not in this boat
         if (player == null || player.getVehicle() != self) return;
 
-        // Cache velocity components to avoid repeated object field accesses
+        // Cache velocity — Vec3d is immutable, so one read is sufficient
         Vec3d velocity = self.getVelocity();
-        double vx = velocity.x;
-        double vy = velocity.y;
-        double vz = velocity.z;
 
         if (client.options.jumpKey.isPressed()) {
             // Ascend: push vertical velocity upward, capped at MAX_VERT_SPEED
-            self.setVelocity(vx, Math.min(vy + FLY_ACCEL, MAX_VERT_SPEED), vz);
+            self.setVelocity(velocity.x, Math.min(velocity.y + FLY_ACCEL, MAX_VERT_SPEED), velocity.z);
             // Zero out fall distance so landing does not deal fall damage
             fallDistance = 0.0F;
 
         } else if (client.options.sneakKey.isPressed()) {
             // Descend: pull vertical velocity downward, capped at -MAX_VERT_SPEED
-            self.setVelocity(vx, Math.max(vy - DESCEND_ACCEL, -MAX_VERT_SPEED), vz);
+            self.setVelocity(velocity.x, Math.max(velocity.y - DESCEND_ACCEL, -MAX_VERT_SPEED), velocity.z);
 
         } else if (!self.isOnGround() && !self.isTouchingWater()) {
             // Hover: dampen vertical motion to resist gravity while airborne
-            self.setVelocity(vx, vy * HOVER_FRICTION - HOVER_GRAVITY, vz);
+            self.setVelocity(velocity.x, velocity.y * HOVER_FRICTION - HOVER_GRAVITY, velocity.z);
             // Keep fall distance at zero so players can descend and land safely
             fallDistance = 0.0F;
         }

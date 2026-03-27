@@ -34,9 +34,8 @@ public class KeyboardMixin {
         // All three required modifiers must be held; ignore Caps/Num-Lock bits
         if ((modifiers & TOGGLE_MODS) != TOGGLE_MODS) return;
 
-        boolean newState = !BoatFlyConfig.flyEnabled.get();
-        BoatFlyConfig.flyEnabled.set(newState);
+        BoatFlyConfig.flyEnabled = !BoatFlyConfig.flyEnabled;
         BoatFlyMod.LOGGER.info("[BoatFly] Flying {}.",
-                newState ? "enabled" : "disabled");
+                BoatFlyConfig.flyEnabled ? "enabled" : "disabled");
     }
 }

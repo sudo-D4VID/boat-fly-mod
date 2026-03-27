@@ -7,6 +7,12 @@ on:
       - 'v*'
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0) — leave blank to only build'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -33,17 +39,17 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build
 
-      - name: Upload JAR artifact
+      - name: Upload sources JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: boatfly-mod
+          name: boatfly-mod-sources
           path: build/libs/*-sources.jar
           if-no-files-found: warn
 
-      - name: Upload compiled mod JAR
+      - name: Upload compiled mod JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: boatfly-mod-compiled
+          name: boatfly-mod
           path: |
             build/libs/*.jar
             !build/libs/*-sources.jar
@@ -54,50 +60,55 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - name: Download compiled mod JAR
+        uses: actions/download-artifact@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          name: boatfly-mod
+          path: build/libs/
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build with Gradle
-        run: ./gradlew build
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/libs/*.jar
-            !build/libs/*-sources.jar
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: build/libs/*.jar
           generate_release_notes: true
           body: |
-            ## Boat Fly Mod ${{ github.ref_name }}
+            ## Boat Fly Mod ${{ steps.tag.outputs.tag }}
 
             ### Installation
             1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for Minecraft 1.20.1
-            2. Download `boatfly-${{ github.ref_name }}.jar` below
+            2. Download `boatfly-${{ steps.tag.outputs.tag }}.jar` below
             3. Drop it into your `.minecraft/mods/` folder
             4. Launch Minecraft with the Fabric profile
 
+            > **No other mods required.** Fabric API is NOT needed.
+
             ### Controls
-            - **Space (Jump)** – Ascend while in a boat
-            - **Shift (Sneak)** – Descend while in a boat
-            - Release both keys to hover / slowly descend
+            | Key | Action |
+            |-----|--------|
+            | Space (Jump) | Ascend while in a boat |
+            | Shift (Sneak) | Descend while in a boat |
+            | Neither | Hover / slow descent |
+            | Ctrl + Alt + Shift + 1 | Toggle flying on/off |
 
             ### Compatibility
             - ✅ Vanilla Minecraft 1.20+
             - ✅ OptiFine (client-side rendering mod, no conflict)
             - ✅ Sodium (client-side rendering mod, no conflict)
             - ✅ Multiplayer (client-side only, no server mod required)
+

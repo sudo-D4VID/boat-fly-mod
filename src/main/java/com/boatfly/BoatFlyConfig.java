@@ -1,7 +1,5 @@
 package com.boatfly;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * Runtime configuration for Boat Fly Mod.
  *
@@ -14,11 +12,10 @@ public final class BoatFlyConfig {
      * Whether the boat-fly feature is currently active.
      *
      * Toggled at runtime by pressing Ctrl+Alt+Shift+1 (default keybind).
-     * An {@link AtomicBoolean} is used so the toggle's read-modify-write
-     * operation is always atomic and well-defined, regardless of any future
-     * threading changes in the game engine.
+     * Both mixins execute on Minecraft's single client thread, so a plain
+     * {@code boolean} is sufficient — no synchronization is needed.
      */
-    public static final AtomicBoolean flyEnabled = new AtomicBoolean(true);
+    public static boolean flyEnabled = true;
 
     private BoatFlyConfig() {
         throw new UnsupportedOperationException("BoatFlyConfig is a static utility class");
