@@ -1,6 +1,8 @@
 package com.boatfly.mixin;
 
+import com.boatfly.BoatFlyConfig;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,73 +14,89 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Mixin into BoatEntity to enable flying mechanics.
  *
- * This is a client-side only mixin. On vanilla servers the server is lenient
- * about boat position updates sent by the controlling player, so the flying
- * works in multiplayer without requiring a server-side mod installation.
+ * Client-side only. On vanilla servers the server is lenient about boat
+ * position updates sent by the controlling player, so flying works in
+ * multiplayer without a server-side installation.
  *
- * Compatibility notes:
- *  - Sodium: only touches rendering, no conflict.
- *  - OptiFine: does not modify BoatEntity, no conflict.
- *  - Vanilla: standard Fabric mixin, no conflict.
+ * Toggle: Ctrl+Alt+Shift+1 (configurable via {@link BoatFlyConfig#flyEnabled}).
+ *
+ * Compatibility:
+ *  - Sodium:   rendering-only mod, no conflict.
+ *  - OptiFine: does not touch BoatEntity, no conflict.
+ *  - Vanilla:  standard Fabric mixin, no conflict.
  */
 @Mixin(BoatEntity.class)
 public abstract class BoatEntityMixin {
 
-    /** Speed gained per tick when pressing Jump (Space). */
+    /** Upward velocity added per tick when Space is held (blocks/tick). */
     private static final double FLY_ACCEL = 0.08;
 
-    /** Speed gained per tick when pressing Sneak (Shift). */
+    /** Downward velocity added per tick when Shift is held (blocks/tick). */
     private static final double DESCEND_ACCEL = 0.05;
 
-    /** Maximum vertical speed cap (blocks/tick). */
+    /** Vertical speed ceiling in either direction (blocks/tick). */
     private static final double MAX_VERT_SPEED = 0.6;
 
-    /** Vertical friction applied when hovering airborne. */
+    /**
+     * Multiplier applied to vertical velocity each tick while airborne and
+     * no vertical key is pressed. Values below 1.0 bleed off momentum,
+     * creating a soft hover instead of free-fall.
+     */
     private static final double HOVER_FRICTION = 0.8;
 
-    /** Gravity counter applied when hovering airborne (slight descent). */
+    /**
+     * Constant subtracted from vertical velocity each tick while hovering
+     * so the boat drifts very slowly downward instead of floating forever.
+     */
     private static final double HOVER_GRAVITY = 0.02;
 
+    /**
+     * Shadowed from {@link net.minecraft.entity.Entity}.
+     * Reset to zero whenever the mod controls vertical movement so that
+     * touching down after flying never triggers fall damage.
+     */
     @Shadow
     protected float fallDistance;
 
     /**
-     * Injected at the end of BoatEntity#tick() to apply fly mechanics.
+     * Injected at the end of {@code BoatEntity#tick()} to apply fly
+     * mechanics. Using {@code RETURN} ensures vanilla physics run first;
+     * we then override only the vertical component as needed.
      */
     @Inject(method = "tick", at = @At("RETURN"))
     private void boatFlyTick(CallbackInfo ci) {
+        // Respect the runtime toggle (Ctrl+Alt+Shift+1)
+        if (!BoatFlyConfig.flyEnabled) return;
+
         BoatEntity self = (BoatEntity) (Object) this;
 
-        // Only run on the logical client - avoids any server-side interference
+        // Only run on the logical client — server instances are ignored
         if (!self.getWorld().isClient) return;
 
+        // Retrieve the player once and reuse the reference
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) return;
+        PlayerEntity player = client.player;
 
-        // Only apply to the boat the local player is currently riding
-        if (client.player.getVehicle() != self) return;
+        // Bail out if there is no local player or they are not in this boat
+        if (player == null || player.getVehicle() != self) return;
 
+        // Cache velocity — Vec3d is immutable, so one read is sufficient
         Vec3d velocity = self.getVelocity();
-        boolean airborne = !self.isOnGround() && !self.isTouchingWater();
 
         if (client.options.jumpKey.isPressed()) {
-            // Ascend: add upward velocity capped at MAX_VERT_SPEED
-            self.setVelocity(velocity.x,
-                    Math.min(velocity.y + FLY_ACCEL, MAX_VERT_SPEED),
-                    velocity.z);
-            // Reset fall distance so landing doesn't deal fall damage
+            // Ascend: push vertical velocity upward, capped at MAX_VERT_SPEED
+            self.setVelocity(velocity.x, Math.min(velocity.y + FLY_ACCEL, MAX_VERT_SPEED), velocity.z);
+            // Zero out fall distance so landing does not deal fall damage
             fallDistance = 0.0F;
+
         } else if (client.options.sneakKey.isPressed()) {
-            // Descend: subtract from vertical velocity, capped at -MAX_VERT_SPEED
-            self.setVelocity(velocity.x,
-                    Math.max(velocity.y - DESCEND_ACCEL, -MAX_VERT_SPEED),
-                    velocity.z);
-        } else if (airborne) {
-            // Hover: slow the boat's vertical motion instead of free-falling
-            self.setVelocity(velocity.x,
-                    velocity.y * HOVER_FRICTION - HOVER_GRAVITY,
-                    velocity.z);
-            // Prevent accumulation of fall distance while hovering
+            // Descend: pull vertical velocity downward, capped at -MAX_VERT_SPEED
+            self.setVelocity(velocity.x, Math.max(velocity.y - DESCEND_ACCEL, -MAX_VERT_SPEED), velocity.z);
+
+        } else if (!self.isOnGround() && !self.isTouchingWater()) {
+            // Hover: dampen vertical motion to resist gravity while airborne
+            self.setVelocity(velocity.x, velocity.y * HOVER_FRICTION - HOVER_GRAVITY, velocity.z);
+            // Keep fall distance at zero so players can descend and land safely
             fallDistance = 0.0F;
         }
     }

@@ -19,6 +19,6 @@ public class BoatFlyMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("[BoatFly] Boat Fly Mod loaded! Hold Space to fly, Shift to descend.");
+        LOGGER.info("[BoatFly] Boat Fly Mod loaded! Space to ascend, Shift to descend. Press Ctrl+Alt+Shift+1 to toggle.");
     }
 }
